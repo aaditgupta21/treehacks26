@@ -81,9 +81,23 @@ Use `team_id` (default: `"default"`) to scope to a team. Each teammate adds the 
 3. New Web Service → Render will use `render.yaml`
 4. Your MCP URL: `https://team-brain-mcp.onrender.com/mcp`
 
+## Elasticsearch + JINA (Optional)
+
+For persistent storage and semantic knowledge search:
+
+1. **Elastic Cloud** — Create a deployment at [cloud.elastic.co](https://cloud.elastic.co)
+2. **Env vars:**
+   - `ELASTIC_CLOUD_ID` + `ELASTIC_API_KEY` (from Elastic Cloud)
+   - Or `ELASTIC_URL` (e.g. `http://localhost:9200`) + `ELASTIC_API_KEY` for self-hosted
+   - `JINA_API_KEY` — from [jina.ai](https://jina.ai) for embeddings
+3. **Knowledge base** — `store_knowledge` and `query_knowledge` use JINA v3 embeddings for semantic search (finds by meaning, not just keywords)
+
+The `elastic/` folder contains a workflow template for Elastic Agent Builder integration.
+
 ## Sponsor Tracks
 
 - **Poke / Interaction Co.** — MCP server, Poke-native, team coordination
+- **Elastic** — JINA v3 embeddings, semantic search, Elastic Cloud, Agent Builder workflows
 - **Decagon** — Multi-turn conversational agent
 - **Anthropic** — Reduces calendar anxiety; tool-using agent
 - **Greylock** — Multi-turn agent; chains tools

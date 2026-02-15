@@ -7,15 +7,21 @@ Connect this to Poke for calendar tetris, knowledge base, shopping lists, and mo
 import os
 from datetime import datetime
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastmcp import FastMCP
 
 from store import (
-    CalendarSlot,
-    KnowledgeEntry,
-    ShoppingItem,
+    add_calendar_slot,
     add_calendar_sync_member,
+    add_knowledge,
+    add_shopping_item,
     get_or_create_team,
     get_team,
+    get_shopping_list as store_get_shopping_list,
+    remove_shopping_item,
+    search_knowledge,
 )
 from poke_relay import send_to_all_pokes
 from config import load_poke_api_keys
@@ -40,16 +46,8 @@ def set_availability(
     summary: str = "",
 ) -> str:
     """Register when a team member is available."""
-    team = get_or_create_team(team_id)
-    team.calendar_slots.append(
-        CalendarSlot(
-            member_id=member_id,
-            member_name=member_name,
-            start=start,
-            end=end,
-            summary=summary,
-        )
-    )
+    get_or_create_team(team_id)
+    add_calendar_slot(team_id, member_id, member_name, start, end, summary, slot_type="availability")
     return f"Recorded availability for {member_name}: {start} to {end}"
 
 
@@ -92,16 +90,8 @@ def book_meeting(
     attendees: list[str] | None = None,
 ) -> str:
     """Book meeting in DB, then send to every Poke in poke_api_keys.txt."""
-    team = get_or_create_team(team_id)
-    team.calendar_slots.append(
-        CalendarSlot(
-            member_id="meeting",
-            member_name=title,
-            start=start,
-            end=end,
-            summary=f"Booked: {', '.join(attendees or [])}",
-        )
-    )
+    get_or_create_team(team_id)
+    add_calendar_slot(team_id, "meeting", title, start, end, f"Booked: {', '.join(attendees or [])}", slot_type="meeting")
 
     keys = load_poke_api_keys()
     if not keys:
@@ -133,10 +123,7 @@ def list_team_calendar(
     meetings = [s for s in team.calendar_slots if s.member_id == "meeting"]
     if not meetings:
         return "No meetings booked yet."
-    lines = [
-        f"- {m.member_name}: {m.start} to {m.end}" + (f" ({m.summary})" if m.summary else "")
-        for m in meetings
-    ]
+    lines = [f"- {m.member_name}: {m.start} to {m.end}" + (f" ({m.summary})" if m.summary else "") for m in meetings]
     return "Team calendar:\n" + "\n".join(lines)
 
 
@@ -176,16 +163,9 @@ def store_knowledge(
     value: str,
     category: str = "fact",
 ) -> str:
-    """Store a piece of team knowledge."""
-    team = get_or_create_team(team_id)
-    team.knowledge.append(
-        KnowledgeEntry(
-            key=key,
-            value=value,
-            category=category,
-            created_at=datetime.utcnow().isoformat(),
-        )
-    )
+    """Store a piece of team knowledge. Uses JINA embeddings for semantic search when Elasticsearch is configured."""
+    get_or_create_team(team_id)
+    add_knowledge(team_id, key, value, category)
     return f"Stored: {key} = {value} (category: {category})"
 
 
@@ -197,21 +177,13 @@ def query_knowledge(
     query: str = "",
     category: str = "",
 ) -> str:
-    """Query stored team knowledge."""
-    team = get_team(team_id)
-    if not team:
+    """Query stored team knowledge. Uses JINA semantic search when Elasticsearch + JINA_API_KEY are configured."""
+    if not get_team(team_id):
         return f"Team '{team_id}' not found."
-    entries = team.knowledge
-    if query:
-        q = query.lower()
-        entries = [e for e in entries if q in e.key.lower() or q in e.value.lower()]
-    if category:
-        entries = [e for e in entries if e.category.lower() == category.lower()]
+    entries = search_knowledge(team_id, query, category)
     if not entries:
         return "No matching knowledge found."
-    return "\n".join(
-        f"- [{e.category}] {e.key}: {e.value}" for e in entries
-    )
+    return "\n".join(f"- [{e['category']}] {e['key']}: {e['value']}" for e in entries)
 
 
 # --- Shopping list tools (Visa commerce track) ---
@@ -226,10 +198,8 @@ def add_to_shopping_list(
     added_by: str = "unknown",
 ) -> str:
     """Add item to team shopping list."""
-    team = get_or_create_team(team_id)
-    team.shopping_list.append(
-        ShoppingItem(name=item, quantity=quantity, added_by=added_by)
-    )
+    get_or_create_team(team_id)
+    add_shopping_item(team_id, item, quantity, added_by)
     return f"Added {quantity}x {item} to shopping list"
 
 
@@ -241,16 +211,12 @@ def get_shopping_list(
     filter_item: str = "",
 ) -> str:
     """Retrieve team shopping list."""
-    team = get_team(team_id)
-    if not team:
+    if not get_team(team_id):
         return f"Team '{team_id}' not found."
-    items = team.shopping_list
-    if filter_item:
-        fq = filter_item.lower()
-        items = [i for i in items if fq in i.name.lower()]
+    items = store_get_shopping_list(team_id, filter_item)
     if not items:
         return "Shopping list is empty."
-    return "\n".join(f"- {i.quantity}x {i.name} (by {i.added_by})" for i in items)
+    return "\n".join(f"- {i['quantity']}x {i['name']} (by {i['added_by']})" for i in items)
 
 
 @mcp.tool(
@@ -261,13 +227,10 @@ def remove_from_shopping_list(
     item: str,
 ) -> str:
     """Remove item from shopping list."""
-    team = get_team(team_id)
-    if not team:
+    if not get_team(team_id):
         return f"Team '{team_id}' not found."
-    for i, x in enumerate(team.shopping_list):
-        if x.name.lower() == item.lower():
-            team.shopping_list.pop(i)
-            return f"Removed {x.name} from shopping list"
+    if remove_shopping_item(team_id, item):
+        return f"Removed {item} from shopping list"
     return f"Item '{item}' not found in shopping list"
 
 
@@ -278,9 +241,11 @@ def remove_from_shopping_list(
 )
 def get_team_brain_info() -> dict:
     """Server info and capabilities."""
+    from store import _use_elastic
     return {
         "name": "Team Brain",
         "description": "Shared AI assistant for teams — calendar, knowledge, shopping",
+        "elasticsearch_enabled": _use_elastic(),
         "tools": [
             "set_availability",
             "find_availability",
@@ -302,7 +267,10 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
 
+    from store import _use_elastic
+    es_status = "connected" if _use_elastic() else "not configured (using in-memory)"
     print(f"Starting Team Brain MCP server on http://{host}:{port}")
+    print(f"Elasticsearch: {es_status}")
     print(f"Connect Poke to: http://localhost:{port}/mcp (or use poke tunnel)")
     print()
 

@@ -1,0 +1,28 @@
+# Elastic Workflow - Team Brain integration
+# Use with Elastic Agent Builder: assign this workflow as a tool to an agent
+# so users can trigger team calendar operations from chat
+#
+# Deploy: Add to Elastic Workflows, create workflow tool in Agent Builder
+# pointing to this workflow
+name: team_brain_calendar
+description: Query or book team calendar events via Team Brain MCP
+trigger:
+  schedule: manual  # or webhook for API triggers
+steps:
+  - id: check_intent
+    name: Determine action
+    # Agent step: use AI to decide if user wants to list or book
+    run: |
+      # Input: user message
+      # Output: action (list|book), params
+  - id: call_mcp
+    name: Call Team Brain MCP
+    run: |
+      # Call Team Brain MCP server tools:
+      # - list_team_calendar for "what's on the team calendar"
+      # - book_meeting for "book 7pm for team"
+      url: ${MCP_SERVER_URL}/mcp
+  - id: return_result
+    name: Return to user
+    run: |
+      # Format and return MCP response
