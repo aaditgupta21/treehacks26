@@ -1,0 +1,6 @@
+# Poke tokens for calendar sync
+# Use JWT tokens (from poke login - check ~/.config/poke/credentials.json) - these work
+# Format: name:eyJ...  or just  eyJ... (one per line)
+#
+# me:eyJ_your_jwt_here
+# armaan:eyJ_armaan_jwt_here

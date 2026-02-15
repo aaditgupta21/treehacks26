@@ -62,12 +62,17 @@ Use `team_id` (default: `"default"`) to scope to a team. Each teammate adds the 
 
 ### Calendar sync flow
 
-1. **You text Cortex** (e.g. via SMS): *"Make a calendar invite for today at 7pm"*
-2. **Poke** calls `book_meeting` → event stored in Team Brain
-3. **Teammates** who registered via `register_for_calendar_sync` receive the invite in their Poke
-4. **Anyone** can ask *"What's on the team calendar?"* → Poke calls `list_team_calendar` → sees all meetings
+1. **Add API keys** — Create `poke_api_keys.txt` in the project root with your and teammates' Poke API keys (one per line):
+   ```
+   me:pk_your_key
+   friend:pk_their_key
+   ```
+   Get keys at [poke.com/kitchen/api-keys](https://poke.com/kitchen/api-keys)
 
-**To receive pushes:** Register at poke.com/kitchen (create webhook) or get your API key from poke.com/kitchen/api-keys, then use `register_for_calendar_sync` with your team.
+2. **You text Cortex** (e.g. via SMS): *"Book 7pm for tonight"* or *"Make a calendar invite for today at 7pm"*
+3. **Poke** calls `book_meeting` → event stored in Team Brain
+4. **All keys in the file** receive the invite in their Poke → adds to their calendar (Poke calendar sync)
+5. **Anyone** can ask *"What's on the team calendar?"* → sees all meetings
 
 ## Deploy to Render
 

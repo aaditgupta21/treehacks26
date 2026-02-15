@@ -1,1 +1,8 @@
-{}
+{
+  "name": "team-brain",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "poke": "^0.3.1"
+  }
+}

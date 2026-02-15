@@ -17,11 +17,12 @@ from store import (
     get_or_create_team,
     get_team,
 )
-from poke_relay import push_calendar_invite_to_poke
+from poke_relay import send_to_all_pokes
+from config import load_poke_api_keys
 
 mcp = FastMCP(
     "Team Brain",
-    instructions="Team Brain is a shared assistant for teams. Use these tools for calendar coordination, team knowledge, and shopping lists. Always specify team_id (default: 'default') to target the right team.",
+    instructions="When user wants to book/schedule a TEAM calendar event (for them and Armaan, or 'for dp', or 'for team'), use book_meeting. It stores in the database AND sends to both Pokes via their API keys. Never use your native calendar for team events — always use book_meeting.",
 )
 
 
@@ -81,7 +82,7 @@ def find_availability(
 
 
 @mcp.tool(
-    description="Book a meeting slot for the team. Records in internal calendar and pushes to all teammates who have registered for calendar sync."
+    description="Book a team calendar event. USE THIS when user wants to schedule for the team, dp, me and Armaan, etc. Stores in database and sends to BOTH Pokes (yours and Armaan's) so it shows up on both calendars. API keys from poke_api_keys.txt."
 )
 def book_meeting(
     team_id: str,
@@ -90,38 +91,33 @@ def book_meeting(
     end: str,
     attendees: list[str] | None = None,
 ) -> str:
-    """Book a meeting, store it, and push to teammates' Pokes."""
+    """Book meeting in DB, then send to every Poke in poke_api_keys.txt."""
     team = get_or_create_team(team_id)
-    slot = CalendarSlot(
-        member_id="meeting",
-        member_name=title,
-        start=start,
-        end=end,
-        summary=f"Booked: {', '.join(attendees or [])}",
+    team.calendar_slots.append(
+        CalendarSlot(
+            member_id="meeting",
+            member_name=title,
+            start=start,
+            end=end,
+            summary=f"Booked: {', '.join(attendees or [])}",
+        )
     )
-    team.calendar_slots.append(slot)
 
-    # Push to teammates who registered for calendar sync
-    event = {
-        "title": title,
-        "start": start,
-        "end": end,
-        "attendees": attendees or [],
-    }
-    pushed = 0
-    for member in team.calendar_sync_members:
-        if push_calendar_invite_to_poke(
-            member.poke_webhook_url,
-            member.poke_webhook_token,
-            event,
-            api_key=member.poke_api_key or "",
-        ):
-            pushed += 1
+    keys = load_poke_api_keys()
+    if not keys:
+        return f"Booked '{title}' from {start} to {end} in database. No API keys in poke_api_keys.txt — add yours and Armaan's keys (pk_xxx from poke.com/kitchen/api-keys) to push to calendars."
 
-    result = f"Booked '{title}' from {start} to {end}. Attendees: {attendees or []}"
-    if pushed > 0:
-        result += f" — Pushed to {pushed} teammate(s) Poke."
-    return result
+    print(f"[Team Brain] Pushing to {len(keys)} Poke(s)...", flush=True)
+    results = send_to_all_pokes(keys, title, start, end)
+    for prefix, ok, err in results:
+        print(f"  {prefix}: {'OK' if ok else 'FAIL ' + err}", flush=True)
+    ok = sum(1 for _, success, _ in results if success)
+    fail = [(p, e) for p, success, e in results if not success]
+
+    out = f"Booked '{title}' from {start} to {end}. Sent to {ok}/{len(keys)} Pokes."
+    if fail:
+        out += f" Failures: {fail}"
+    return out
 
 
 @mcp.tool(

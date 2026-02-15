@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+
+# Poke API keys - add your own, never commit
+poke_api_keys.txt
+
+node_modules/
