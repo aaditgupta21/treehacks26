@@ -28,6 +28,8 @@ from store import (
 from elastic_store import get_calendar_slots as es_get_calendar_slots
 from poke_relay import send_to_all_pokes
 from config import load_poke_api_keys, load_poke_api_keys_with_names
+from project_store import register_project as store_register_project, get_project, list_projects
+from coding_agent import run_code_change
 
 mcp = FastMCP(
     "Team Brain",
@@ -38,7 +40,9 @@ mcp = FastMCP(
 2. SYNCED / INDIVIDUAL EVENTS (use sync_my_calendar): When user says 'sync my calendar', get THEIR events (next 7 days) and call sync_my_calendar. These are that person's personal events — stored in Team Brain ONLY for visibility so teammates can see when they're busy. NEVER add or book these events to anyone else's calendar. Armaan's synced events stay his; do NOT put them on Aadit's calendar. When checking availability, we read synced events to know when someone is busy — we do NOT copy them to other people's calendars.
 
 Sync: member_id 'aadit' or 'armaan' based on who is messaging. Do NOT ask for API keys.
-Availability: get_member_availability for whole-day, check_member_free for specific time. Pass requester_id.""",
+Availability: get_member_availability for whole-day, check_member_free for specific time. Pass requester_id.
+
+CODE CHANGES & GITHUB: Team Brain CAN push code and open PRs. When the user asks for code changes on a repo, Vercel project, or "my project": (1) If they give a repo URL, use register_project first (team_id default, repo_url, default_branch main, optional name). (2) Then use request_code_change with that project name/id and their instruction. Reply with the PR link you get back. Do NOT say Team Brain can't do code or that they need to use VSCode — use the tools.""",
 )
 
 
@@ -399,6 +403,60 @@ def remove_from_shopping_list(
     return f"Item '{item}' not found in shopping list"
 
 
+# --- Vercel / GitHub code change (text-to-PR) ---
+
+@mcp.tool(
+    description="[PUSH CODE] Register a GitHub repo so Team Brain can push code and open PRs. Call this first, then request_code_change. repo_url e.g. https://github.com/owner/repo. default_branch usually 'main'. name optional."
+)
+def register_project(
+    team_id: str,
+    repo_url: str,
+    default_branch: str = "main",
+    name: str = "",
+) -> str:
+    """Register a project. After this, use request_code_change with the same team_id and project name or repo slug."""
+    return store_register_project(team_id, repo_url, default_branch, name or None)
+
+
+@mcp.tool(
+    description="[PUSH CODE] List GitHub projects registered for code changes. Use before request_code_change to see project names. team_id default 'default'."
+)
+def list_projects_tool(team_id: str = "default") -> str:
+    """List registered projects so the user can request_code_change by name."""
+    projects = list_projects(team_id)
+    if not projects:
+        return "No projects registered. Use register_project to add a repo (e.g. repo_url=https://github.com/owner/repo)."
+    lines = [f"- {p.get('name') or p.get('project_id')}: {p.get('repo_url', '')} (branch: {p.get('default_branch', 'main')})" for p in projects]
+    return "Registered projects:\n" + "\n".join(lines)
+
+
+@mcp.tool(
+    description="[PUSH CODE] Push code to GitHub and open a PR. Clone repo, apply user's change with Claude, push branch, create PR. Use after register_project. Params: team_id (default 'default'), project_name_or_id (name or owner/repo), instruction (what to change). Returns PR URL."
+)
+def request_code_change(
+    team_id: str,
+    project_name_or_id: str,
+    instruction: str,
+) -> str:
+    """Run the coding agent: make changes per instruction, then create a PR. Returns PR link or error message."""
+    project = get_project(team_id, project_name_or_id)
+    if not project:
+        projects = list_projects(team_id)
+        if not projects:
+            return "No projects registered. Use register_project first (e.g. repo_url=https://github.com/owner/repo)."
+        names = ", ".join(p.get("name") or p.get("project_id", "") for p in projects)
+        return f"Project '{project_name_or_id}' not found. Registered projects: {names}"
+    repo_url = project.get("repo_url", "")
+    default_branch = project.get("default_branch", "main")
+    result = run_code_change(repo_url, default_branch, instruction)
+    if result.get("ok"):
+        msg = result.get("message", "")
+        if result.get("preview_url"):
+            msg += f" Preview: {result['preview_url']}"
+        return msg
+    return result.get("message", "Code change failed.")
+
+
 # --- Utility ---
 
 @mcp.tool(
@@ -408,7 +466,8 @@ def get_team_brain_info() -> dict:
     """Server info and capabilities."""
     return {
         "name": "Team Brain",
-        "description": "Shared AI assistant for teams — calendar, knowledge, shopping",
+        "description": "Shared AI for teams: calendar, knowledge, shopping, AND push code to GitHub / create PRs (register_project, request_code_change).",
+        "can_push_code": True,
         "elasticsearch_enabled": True,
         "tools": [
             "set_availability",
@@ -424,6 +483,9 @@ def get_team_brain_info() -> dict:
             "add_to_shopping_list",
             "get_shopping_list",
             "remove_from_shopping_list",
+            "register_project",
+            "list_projects_tool",
+            "request_code_change",
         ],
         "default_team_id": "default",
         "environment": os.environ.get("ENVIRONMENT", "development"),
