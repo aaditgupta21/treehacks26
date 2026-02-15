@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: team-brain-mcp
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/server.py
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
