@@ -5,7 +5,6 @@ import {
   getMeetings,
   getKnowledge,
   getShoppingList,
-  addKnowledge as apiAddKnowledge,
   removeShoppingItem as apiRemoveShoppingItem,
   deleteMeeting as apiDeleteMeeting,
   type Meeting,
@@ -15,15 +14,13 @@ import {
 import CalendarView from "@/components/CalendarView";
 import EntriesView from "@/components/EntriesView";
 import ShoppingListView from "@/components/ShoppingListView";
-import AddEntryForm from "@/components/AddEntryForm";
 
-type Tab = "calendar" | "entries" | "shopping" | "add";
+type Tab = "calendar" | "entries" | "shopping";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "calendar", label: "Calendar" },
   { id: "entries", label: "Knowledge" },
   { id: "shopping", label: "Shopping" },
-  { id: "add", label: "Add Entry" },
 ];
 
 export default function DashboardPage() {
@@ -61,18 +58,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleAdd = useCallback(
-    async (entry: KnowledgeEntry) => {
-      try {
-        await apiAddKnowledge(teamId, entry.key, entry.value, entry.category);
-        setEntries((prev) => [...prev, entry]);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to add entry");
-      }
-    },
-    [teamId]
-  );
 
   const handleRemoveShopping = useCallback(
     async (item: string) => {
@@ -149,7 +134,6 @@ export default function DashboardPage() {
       )}
       {activeTab === "entries" && <EntriesView entries={entries} />}
       {activeTab === "shopping" && <ShoppingListView items={shoppingList} onRemove={handleRemoveShopping} />}
-      {activeTab === "add" && <AddEntryForm onAdd={handleAdd} />}
     </>
   );
 }
