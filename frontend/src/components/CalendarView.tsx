@@ -2,7 +2,6 @@
 
 import { Meeting, getMeetingsByDay, formatDayHeader, formatTimeRange } from "@/lib/data";
 
-/** Team calendar: shows only team events (book_meeting). Personal/synced events stay in ES for availability only and are not shown here. */
 interface Props {
   meetings: Meeting[];
   onRemove?: (meeting: Meeting) => void;

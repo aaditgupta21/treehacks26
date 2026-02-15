@@ -62,10 +62,9 @@ def health():
 
 @app.route("/api/meetings")
 def get_meetings():
-    """Return only TEAM events (member_id=meeting). Personal/synced events live in ES for availability (open times) only and are never shown on the team calendar frontend."""
     team_id = request.args.get("team_id", DEFAULT_TEAM)
     get_or_create_team(team_id)
-    slots = get_calendar_slots(team_id, member_id_filter="meeting", slot_type="meeting")
+    slots = get_calendar_slots(team_id, slot_type="meeting")
     meetings = [
         {"title": s["member_name"], "start": s["start"], "end": s["end"], "attendees": _parse_attendees(s.get("summary", ""))}
         for s in slots

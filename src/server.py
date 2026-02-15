@@ -42,15 +42,12 @@ from coding_agent import run_code_change
 
 mcp = FastMCP(
     "Team Brain",
-    instructions="""CALENDAR — two kinds of events; do not mix them.
+    instructions="""IMPORTANT — two types of calendar events:
 
-PERSONAL EVENTS (one person's own calendar: classes, flight, dinner, etc.):
-- When user says "sync my calendar": call sync_my_calendar only. That pushes THEIR personal events into Brain (Elasticsearch) for that member_id. Personal events are NEVER shown on the team calendar frontend and NEVER pushed to the other person's Poke/Google. They exist in ES only so we can find open times (get_member_availability, check_member_free). Do NOT call book_meeting for personal/synced events.
+1. TEAM EVENTS (use book_meeting): When user wants to schedule something for BOTH of them (me and Armaan, team meeting, dp). Use book_meeting — it adds to both calendars and both attend. Never add team events via personal calendar.
 
-TEAM EVENTS (meetings everyone attends together):
-- When user says "book a meeting" / "schedule a team meeting": call book_meeting. Those are the only events that show on the team calendar (frontend) and get pushed to both people's calendars. Only use book_meeting for new meetings the whole team will attend.
+2. SYNCED / INDIVIDUAL EVENTS (use sync_my_calendar): When user says 'sync my calendar', get THEIR events (next 7 days) and call sync_my_calendar. These are that person's personal events — stored in Team Brain ONLY for visibility so teammates can see when they're busy. NEVER add or book these events to anyone else's calendar. Armaan's synced events stay his; do NOT put them on Aadit's calendar. When checking availability, we read synced events to know when someone is busy — we do NOT copy them to other people's calendars.
 
-Summary: Sync calendar = push that person's personal events into Brain (ES) → we use ES to find open times. Team calendar (frontend) = only team events (book_meeting). Personal events stay in ES for availability only.
 Sync: member_id 'aadit' or 'armaan' based on who is messaging. Do NOT ask for API keys.
 Availability: get_member_availability for whole-day, check_member_free for specific time. Pass requester_id.
 
@@ -159,7 +156,7 @@ def list_team_calendar(
 
 
 @mcp.tool(
-    description="Push one member's PERSONAL events into Brain (Elasticsearch) for the next 7 days. Use ONLY when user says 'sync my calendar'. Personal events are for availability/finding open times only — they do NOT show on the team calendar frontend and are NOT pushed to other people's calendars. member_id = who is syncing (armaan/aadit). Do NOT call book_meeting for these. Do NOT ask for API key."
+    description="Sync a member's calendar into Team Brain (next 7 days only). When user says 'sync my calendar', get their events for the next week and call this with events=[{title, start, end}, ...]. member_id: 'aadit' or 'armaan'. Do NOT ask for API key."
 )
 def sync_my_calendar(
     team_id: str,
