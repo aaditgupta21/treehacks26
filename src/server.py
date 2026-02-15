@@ -21,10 +21,11 @@ from store import (
     get_team,
     get_shopping_list as store_get_shopping_list,
     remove_shopping_item,
+    remove_meeting,
     search_knowledge,
 )
 from poke_relay import send_to_all_pokes
-from config import load_poke_api_keys
+from config import load_poke_api_keys, load_poke_api_keys_with_names
 
 mcp = FastMCP(
     "Team Brain",
@@ -91,9 +92,14 @@ def book_meeting(
 ) -> str:
     """Book meeting in DB, then send to every Poke in poke_api_keys.txt."""
     get_or_create_team(team_id)
-    add_calendar_slot(team_id, "meeting", title, start, end, f"Booked: {', '.join(attendees or [])}", slot_type="meeting")
+    # Use names from poke_api_keys.txt as attendees (everyone who receives the invite)
+    # Don't merge with AI-passed attendees — avoids duplicates like "Aadit" + "Aadit Gupta"
+    keys_with_names = load_poke_api_keys_with_names()
+    attendee_names = [n for n, _ in keys_with_names]
+    keys = [k for _, k in keys_with_names]
+    summary = f"Booked: {', '.join(attendee_names)}"
+    add_calendar_slot(team_id, "meeting", title, start, end, summary, slot_type="meeting")
 
-    keys = load_poke_api_keys()
     if not keys:
         return f"Booked '{title}' from {start} to {end} in database. No API keys in poke_api_keys.txt — add yours and Armaan's keys (pk_xxx from poke.com/kitchen/api-keys) to push to calendars."
 
@@ -125,6 +131,23 @@ def list_team_calendar(
         return "No meetings booked yet."
     lines = [f"- {m.member_name}: {m.start} to {m.end}" + (f" ({m.summary})" if m.summary else "") for m in meetings]
     return "Team calendar:\n" + "\n".join(lines)
+
+
+@mcp.tool(
+    description="Delete a meeting from the team calendar. Pass the meeting title (e.g. 'Celebration for TreeHacks Win'). Optionally pass start and end if there are multiple meetings with same title."
+)
+def delete_meeting(
+    team_id: str,
+    title: str,
+    start: str = "",
+    end: str = "",
+) -> str:
+    """Remove a meeting from the team calendar."""
+    if not get_team(team_id):
+        return f"Team '{team_id}' not found."
+    if remove_meeting(team_id, title, start, end):
+        return f"Deleted meeting '{title}' from the calendar."
+    return f"Meeting '{title}' not found. Use list_team_calendar to see current meetings."
 
 
 @mcp.tool(
@@ -250,6 +273,7 @@ def get_team_brain_info() -> dict:
             "find_availability",
             "book_meeting",
             "list_team_calendar",
+            "delete_meeting",
             "register_for_calendar_sync",
             "store_knowledge",
             "query_knowledge",

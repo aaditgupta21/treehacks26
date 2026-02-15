@@ -4,9 +4,10 @@ import { Meeting, getMeetingsByDay, formatDayHeader, formatTimeRange } from "@/l
 
 interface Props {
   meetings: Meeting[];
+  onRemove?: (meeting: Meeting) => void;
 }
 
-export default function CalendarView({ meetings = [] }: Props) {
+export default function CalendarView({ meetings = [], onRemove }: Props) {
   const safeMeetings = Array.isArray(meetings) ? meetings : [];
   const byDay = getMeetingsByDay(safeMeetings);
   const days = Object.keys(byDay).sort();
@@ -36,14 +37,35 @@ export default function CalendarView({ meetings = [] }: Props) {
           <div className="day-events">
             {byDay[day].map((m, j) => (
               <article key={j} className="calendar-event">
-                <h3 className="event-title">{m.title}</h3>
-                <div className="event-time">
-                  {formatTimeRange(m.start, m.end)}
-                </div>
-                <div className="event-attendees">
-                  {m.attendees.map((a) => (
-                    <span key={a}>{a}</span>
-                  ))}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
+                  <div style={{ flex: 1 }}>
+                    <h3 className="event-title">{m.title}</h3>
+                    <div className="event-time">
+                      {formatTimeRange(m.start, m.end)}
+                    </div>
+                    <div className="event-attendees">
+                      {m.attendees.map((a) => (
+                        <span key={a}>{a}</span>
+                      ))}
+                    </div>
+                  </div>
+                  {onRemove && (
+                    <button
+                      type="button"
+                      onClick={() => onRemove(m)}
+                      className="btn"
+                      style={{
+                        padding: "0.25rem 0.5rem",
+                        fontSize: "0.8rem",
+                        background: "rgba(255,100,100,0.2)",
+                        color: "var(--peach-dark)",
+                        border: "1px solid rgba(255,100,100,0.4)",
+                      }}
+                      aria-label={`Delete ${m.title}`}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

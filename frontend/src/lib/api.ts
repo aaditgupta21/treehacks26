@@ -51,6 +51,18 @@ export async function getMeetings(teamId = "default"): Promise<Meeting[]> {
   return data.meetings;
 }
 
+export async function deleteMeeting(
+  teamId: string,
+  title: string,
+  start: string,
+  end: string
+): Promise<void> {
+  const params = new URLSearchParams({ team_id: teamId, title });
+  if (start) params.set("start", start);
+  if (end) params.set("end", end);
+  await fetchApi(`/api/meetings?${params}`, { method: "DELETE" });
+}
+
 export async function getKnowledge(
   teamId = "default",
   query?: string,

@@ -7,6 +7,7 @@ import {
   getShoppingList,
   addKnowledge as apiAddKnowledge,
   removeShoppingItem as apiRemoveShoppingItem,
+  deleteMeeting as apiDeleteMeeting,
   type Meeting,
   type KnowledgeEntry,
   type ShoppingItem,
@@ -85,6 +86,23 @@ export default function DashboardPage() {
     [teamId]
   );
 
+  const handleRemoveMeeting = useCallback(
+    async (meeting: Meeting) => {
+      try {
+        await apiDeleteMeeting(teamId, meeting.title, meeting.start, meeting.end);
+        setMeetings((prev) =>
+          prev.filter(
+            (m) =>
+              !(m.title === meeting.title && m.start === meeting.start && m.end === meeting.end)
+          )
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete meeting");
+      }
+    },
+    [teamId]
+  );
+
   if (loading) {
     return (
       <div className="glass-card" style={{ textAlign: "center", padding: "2rem" }}>
@@ -126,7 +144,9 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {activeTab === "calendar" && <CalendarView meetings={meetings} />}
+      {activeTab === "calendar" && (
+        <CalendarView meetings={meetings} onRemove={handleRemoveMeeting} />
+      )}
       {activeTab === "entries" && <EntriesView entries={entries} />}
       {activeTab === "shopping" && <ShoppingListView items={shoppingList} onRemove={handleRemoveShopping} />}
       {activeTab === "add" && <AddEntryForm onAdd={handleAdd} />}

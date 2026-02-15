@@ -13,25 +13,33 @@ def _find_api_keys_file() -> Path:
 
 
 def load_poke_api_keys() -> list[str]:
+    """Load raw API keys. Use load_poke_api_keys_with_names() for (name, key) pairs."""
+    return [k for _, k in load_poke_api_keys_with_names()]
+
+
+def load_poke_api_keys_with_names() -> list[tuple[str, str]]:
     """
-    Load all Poke API keys from poke_api_keys.txt.
-    Returns raw keys (pk_xxx) - one per line. Skips comments and empty lines.
+    Load (name, key) from poke_api_keys.txt.
+    Format: name:key (e.g. Aadit:eyJ..., armaan:eyJ...) — use "Aadit", "Armaan" for frontend display.
+    Returns list of (name, key). Name is capitalized for display.
     """
     f = _find_api_keys_file()
     if not f.exists():
         return []
-    keys = []
+    out = []
     for line in f.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        # Support name:pk_xxx or just pk_xxx
         if ":" in line:
-            _, key = line.split(":", 1)
+            name, key = line.split(":", 1)
+            name = name.strip()
             key = key.strip()
         else:
+            name = "Teammate"
             key = line
-        # JWT (eyJ...) from poke login works; pk_ often returns 401
         if len(key) > 20 and (key.startswith("pk_") or key.startswith("eyJ")):
-            keys.append(key)
-    return keys
+            # Capitalize name for display (me -> Me, armaan -> Armaan)
+            name = name.strip().capitalize() if name else "Teammate"
+            out.append((name, key))
+    return out

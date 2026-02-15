@@ -158,6 +158,28 @@ def get_calendar_slots(team_id: str, member_id_filter: Optional[str] = None, slo
     return [h["_source"] for h in hits]
 
 
+def delete_meeting(team_id: str, title: str, start: str = "", end: str = "") -> bool:
+    """Delete a meeting by title and optionally start/end. Returns True if any docs deleted."""
+    es = _es_client()
+    if not es:
+        return False
+    must = [
+        {"term": {"team_id": team_id}},
+        {"term": {"type": "meeting"}},
+        {"term": {"member_id": "meeting"}},
+        {"match_phrase": {"member_name": title}},
+    ]
+    if start:
+        must.append({"term": {"start": start}})
+    if end:
+        must.append({"term": {"end": end}})
+    r = es.delete_by_query(index=IDX_CALENDAR, query={"bool": {"must": must}})
+    deleted = r.get("deleted", 0)
+    if deleted:
+        _log("DELETE", IDX_CALENDAR, deleted, f"team_id={team_id} title={title}")
+    return deleted > 0
+
+
 # --- Knowledge (with JINA semantic search) ---
 
 def add_knowledge(team_id: str, key: str, value: str, category: str = "fact") -> None:

@@ -31,6 +31,7 @@ from store import (
     add_shopping_item,
     get_shopping_list as store_get_shopping_list,
     remove_shopping_item,
+    remove_meeting,
 )
 from elastic_store import get_calendar_slots
 
@@ -69,6 +70,19 @@ def get_meetings():
         for s in slots
     ]
     return jsonify({"meetings": meetings})
+
+
+@app.route("/api/meetings", methods=["DELETE"])
+def delete_meeting():
+    team_id = request.args.get("team_id", DEFAULT_TEAM)
+    title = request.args.get("title", "")
+    start = request.args.get("start", "")
+    end = request.args.get("end", "")
+    if not title:
+        return jsonify({"detail": "title required"}), 400
+    if remove_meeting(team_id, title, start, end):
+        return jsonify({"ok": True, "removed": title})
+    return jsonify({"detail": f"Meeting '{title}' not found"}), 404
 
 
 @app.route("/api/knowledge")
