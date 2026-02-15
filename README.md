@@ -81,6 +81,27 @@ Use `team_id` (default: `"default"`) to scope to a team. Each teammate adds the 
 3. New Web Service → Render will use `render.yaml`
 4. Your MCP URL: `https://team-brain-mcp.onrender.com/mcp`
 
+## Frontend (Next.js)
+
+The dashboard displays calendar, knowledge, and shopping data from the API (Elasticsearch when configured):
+
+```bash
+# Terminal 1: MCP server (for Poke)
+python src/server.py
+
+# Terminal 2: REST API (for frontend) — run from project root so .env loads
+python run_api.py
+
+# Terminal 3: Frontend
+cd frontend && npm install && npm run dev
+```
+
+- MCP (Poke): http://localhost:8000/mcp
+- REST API: http://localhost:8001/api/...
+- Frontend: http://localhost:3000
+
+Set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to override the API URL (e.g. when deployed).
+
 ## Elasticsearch + JINA (Optional)
 
 For persistent storage and semantic knowledge search:

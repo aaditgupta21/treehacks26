@@ -241,11 +241,10 @@ def remove_from_shopping_list(
 )
 def get_team_brain_info() -> dict:
     """Server info and capabilities."""
-    from store import _use_elastic
     return {
         "name": "Team Brain",
         "description": "Shared AI assistant for teams — calendar, knowledge, shopping",
-        "elasticsearch_enabled": _use_elastic(),
+        "elasticsearch_enabled": True,
         "tools": [
             "set_availability",
             "find_availability",
@@ -267,11 +266,10 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
 
-    from store import _use_elastic
-    es_status = "connected" if _use_elastic() else "not configured (using in-memory)"
-    print(f"Starting Team Brain MCP server on http://{host}:{port}")
+    es_status = "connected"
+    print(f"Team Brain MCP server on http://{host}:{port}/mcp")
     print(f"Elasticsearch: {es_status}")
-    print(f"Connect Poke to: http://localhost:{port}/mcp (or use poke tunnel)")
+    print(f"Connect Poke:  poke tunnel http://localhost:{port}/mcp --name \"Team Brain\"")
     print()
 
     mcp.run(

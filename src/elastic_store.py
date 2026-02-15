@@ -25,18 +25,21 @@ def _es_client():
     global _client
     if _client is not None:
         return _client
-    cloud_id = os.environ.get("ELASTIC_CLOUD_ID")
     api_key = os.environ.get("ELASTIC_API_KEY")
-    url = os.environ.get("ELASTIC_URL", "http://localhost:9200")
     if not api_key:
         return None
+    url = os.environ.get("ELASTIC_URL", "").strip()
+    cloud_id = os.environ.get("ELASTIC_CLOUD_ID", "").strip()
     try:
         from elasticsearch import Elasticsearch
 
-        if cloud_id:
+        # Prefer ELASTIC_URL (full https URL) - same as curl, most reliable
+        if url and url.startswith("http"):
+            _client = Elasticsearch(hosts=[url], api_key=api_key)
+        elif cloud_id:
             _client = Elasticsearch(cloud_id=cloud_id, api_key=api_key)
         else:
-            _client = Elasticsearch(hosts=[url], api_key=api_key)
+            return None
         _client.info()
         return _client
     except Exception:

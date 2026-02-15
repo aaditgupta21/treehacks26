@@ -6,11 +6,19 @@ interface Props {
   entries: KnowledgeEntry[];
 }
 
-export default function EntriesView({ entries }: Props) {
-  const groups = getEntriesByCategory(entries);
+export default function EntriesView({ entries = [] }: Props) {
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  const groups = getEntriesByCategory(safeEntries);
 
   if (groups.length === 0) {
-    return <p style={{ color: "var(--text-muted)" }}>No entries yet.</p>;
+    return (
+      <div className="glass-card" style={{ padding: "2rem", textAlign: "center" }}>
+        <p style={{ color: "var(--text)", fontSize: "1rem", margin: 0 }}>No knowledge entries yet.</p>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: "0.5rem" }}>
+          Add team facts, brand info, or policies in the Add Entry tab.
+        </p>
+      </div>
+    );
   }
 
   return (

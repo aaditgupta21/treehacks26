@@ -6,12 +6,20 @@ interface Props {
   meetings: Meeting[];
 }
 
-export default function CalendarView({ meetings }: Props) {
-  const byDay = getMeetingsByDay(meetings);
+export default function CalendarView({ meetings = [] }: Props) {
+  const safeMeetings = Array.isArray(meetings) ? meetings : [];
+  const byDay = getMeetingsByDay(safeMeetings);
   const days = Object.keys(byDay).sort();
 
   if (days.length === 0) {
-    return <p style={{ color: "var(--text-muted)" }}>No events yet.</p>;
+    return (
+      <div className="glass-card" style={{ padding: "2rem", textAlign: "center" }}>
+        <p style={{ color: "var(--text)", fontSize: "1rem", margin: 0 }}>No events yet.</p>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: "0.5rem" }}>
+          Add meetings via Poke or the Add Entry tab.
+        </p>
+      </div>
+    );
   }
 
   return (
