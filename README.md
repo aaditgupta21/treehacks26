@@ -47,7 +47,7 @@ Ask Poke things like:
 1. *"Use Team Brain to register my project: repo https://github.com/username/my-app, branch main, name my Vercel project"* → calls `register_project`
 2. *"Use Team Brain to make changes on my Vercel project: make the header say Welcome and add a blue CTA button"* → calls `request_code_change`; you get back a PR link (and optional Vercel preview).
 
-Requires on the server: `GITHUB_TOKEN` (repo push + create PR), `ANTHROPIC_API_KEY` (Claude for code edits). Optional: `CLAUDE_CODING_MODEL` (default `claude-3-5-sonnet-20241022`).
+Requires on the server: `GITHUB_TOKEN` (repo push + create PR), `ANTHROPIC_API_KEY` (Claude for code edits). Optional: `CLAUDE_CODING_MODEL` (default `claude-sonnet-4-5`).
 
 ## Tools (14 total)
 

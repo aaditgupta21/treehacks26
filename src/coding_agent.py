@@ -170,10 +170,14 @@ def run_code_change(
         return {"ok": False, "pr_url": None, "message": "Repo URL must be a GitHub URL (e.g. https://github.com/owner/repo).", "preview_url": None}
     owner, repo = match.group(1), match.group(2).replace(".git", "")
 
+    print(f"[coding_agent] Starting: repo={owner}/{repo} branch={default_branch} instruction={instruction[:80]}{'...' if len(instruction) > 80 else ''}", flush=True)
+
     with tempfile.TemporaryDirectory(prefix="team_brain_code_") as tmp:
         work_dir = os.path.join(tmp, "repo")
+        print(f"[coding_agent] Cloning {repo_url} ...", flush=True)
         if not _clone_repo(repo_url, default_branch, work_dir, token):
             return {"ok": False, "pr_url": None, "message": "Failed to clone repo. Check repo_url and GITHUB_TOKEN.", "preview_url": None}
+        print(f"[coding_agent] Clone OK. Starting Claude agent.", flush=True)
 
         branch_name = f"team-brain-{os.urandom(4).hex()}"
         client = Anthropic(api_key=api_key)
@@ -242,13 +246,15 @@ Do not make up files that don't exist. Prefer editing existing files. Keep chang
         pr_body = instruction
 
         for step in range(max_steps):
+            print(f"[coding_agent] Step {step + 1}/{max_steps}: calling Claude ...", flush=True)
             response = client.messages.create(
-                model=os.environ.get("CLAUDE_CODING_MODEL", "claude-3-5-sonnet-20241022"),
+                model=os.environ.get("CLAUDE_CODING_MODEL", "claude-sonnet-4-5"),
                 max_tokens=4096,
                 system=system,
                 messages=messages,
                 tools=tools,
             )
+            print(f"[coding_agent] Step {step + 1}: stop_reason={response.stop_reason}", flush=True)
 
             if response.stop_reason == "end_turn":
                 # Parse final text for PR_TITLE/PR_BODY
@@ -260,9 +266,11 @@ Do not make up files that don't exist. Prefer editing existing files. Keep chang
                                 pr_title = line.replace("PR_TITLE:", "").strip() or pr_title
                             if line.strip().startswith("PR_BODY:"):
                                 pr_body = line.replace("PR_BODY:", "").strip() or pr_body
+                print(f"[coding_agent] Claude finished (end_turn). PR title: {pr_title}", flush=True)
                 break
 
             if response.stop_reason != "tool_use":
+                print(f"[coding_agent] Stopping: stop_reason={response.stop_reason}", flush=True)
                 break
 
             # Append assistant content and run tools
@@ -274,7 +282,21 @@ Do not make up files that don't exist. Prefer editing existing files. Keep chang
                 tool_id = block.id
                 tool_name = block.name
                 tool_args = block.input
+                # Log tool call (truncate file content for readability)
+                if tool_name == "read_file":
+                    print(f"[coding_agent]   tool: {tool_name} path={tool_args.get('path', '')}", flush=True)
+                elif tool_name == "write_file":
+                    path = tool_args.get("path", "")
+                    content_len = len(tool_args.get("content", ""))
+                    print(f"[coding_agent]   tool: {tool_name} path={path} content_len={content_len}", flush=True)
+                elif tool_name == "run_command":
+                    cmd = (tool_args.get("command", "") or "")[:60]
+                    print(f"[coding_agent]   tool: {tool_name} command={cmd}{'...' if len(tool_args.get('command', '')) > 60 else ''}", flush=True)
+                else:
+                    print(f"[coding_agent]   tool: {tool_name} {tool_args}", flush=True)
                 result = _run_tool(work_dir, tool_name, tool_args)
+                result_preview = result[:100] + "..." if len(result) > 100 else result
+                print(f"[coding_agent]   result: {result_preview}", flush=True)
                 tool_results.append({"type": "tool_result", "tool_use_id": tool_id, "content": result})
 
             if not tool_results:
@@ -282,6 +304,7 @@ Do not make up files that don't exist. Prefer editing existing files. Keep chang
             messages.append({"role": "user", "content": tool_results})
 
         # Push branch and create PR (we already told the agent to push; if it didn't, try ourselves)
+        print(f"[coding_agent] Git: checkout -b {branch_name}, add, commit, push ...", flush=True)
         try:
             subprocess.run(["git", "checkout", "-b", branch_name], cwd=work_dir, check=True, capture_output=True, timeout=10)
         except subprocess.CalledProcessError:
@@ -323,17 +346,23 @@ Do not make up files that don't exist. Prefer editing existing files. Keep chang
         except subprocess.CalledProcessError as e:
             err = (e.stderr or e.stdout or str(e)) or ""
             if "already exists" in err or "rejected" in err:
+                print(f"[coding_agent] Push (branch may already exist), creating PR ...", flush=True)
                 pass  # Agent may have pushed; still try to create PR
             else:
+                print(f"[coding_agent] Push failed: {err[:200]}", flush=True)
                 return {
                     "ok": False,
                     "pr_url": None,
                     "message": f"Push failed: {err}",
                     "preview_url": None,
                 }
+        else:
+            print(f"[coding_agent] Push OK. Creating PR ...", flush=True)
 
         pr_url = _create_pr(owner, repo, branch_name, default_branch, pr_title, pr_body, token)
         if pr_url:
+            print(f"[coding_agent] PR created: {pr_url}", flush=True)
             preview_url = f"https://vercel.com/teams/.../preview"  # Optional: could resolve from Vercel API
             return {"ok": True, "pr_url": pr_url, "message": f"PR created: {pr_url}", "preview_url": None}
+        print(f"[coding_agent] PR creation failed.", flush=True)
         return {"ok": False, "pr_url": None, "message": "PR creation failed. Check GitHub token permissions.", "preview_url": None}

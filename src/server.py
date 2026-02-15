@@ -5,10 +5,19 @@ Connect this to Poke for calendar tetris, knowledge base, shopping lists, and mo
 """
 
 import os
+from pathlib import Path
 from datetime import datetime
 
 from dotenv import load_dotenv
-load_dotenv()
+
+# Load .env from project root so ANTHROPIC_API_KEY etc. are set regardless of cwd
+_root = Path(__file__).resolve().parent.parent
+for p in [_root / ".env", Path.cwd() / ".env"]:
+    if p.exists():
+        load_dotenv(p)
+        break
+else:
+    load_dotenv()
 
 from fastmcp import FastMCP
 
