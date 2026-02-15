@@ -12,6 +12,8 @@ from elastic_store import (
     add_calendar_slot as _es_add_calendar_slot,
     get_calendar_slots as _es_get_calendar_slots,
     delete_meeting as _es_delete_meeting,
+    has_synced_calendar as _es_has_synced_calendar,
+    sync_member_calendar as _es_sync_member_calendar,
     add_knowledge as _es_add_knowledge,
     query_knowledge as _es_query_knowledge,
     add_shopping_item as _es_add_shopping_item,
@@ -85,6 +87,14 @@ def add_calendar_slot(team_id: str, member_id: str, member_name: str, start: str
 
 def remove_meeting(team_id: str, title: str, start: str = "", end: str = "") -> bool:
     return _es_delete_meeting(team_id, title, start, end)
+
+
+def has_synced_calendar(team_id: str, member_id: str) -> bool:
+    return _es_has_synced_calendar(team_id, member_id)
+
+
+def sync_member_calendar(team_id: str, member_id: str, member_name: str, events: list[dict]) -> int:
+    return _es_sync_member_calendar(team_id, member_id, member_name, events)
 
 
 def add_knowledge(team_id: str, key: str, value: str, category: str = "fact") -> None:

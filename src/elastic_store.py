@@ -142,6 +142,29 @@ def add_calendar_slot(team_id: str, member_id: str, member_name: str, start: str
     )
 
 
+def has_synced_calendar(team_id: str, member_id: str) -> bool:
+    """Return True if member has any synced calendar events in ES."""
+    es = _es_client()
+    if not es:
+        return False
+    mid = (member_id or "").strip().lower()
+    if not mid:
+        return False
+    r = es.count(
+        index=IDX_CALENDAR,
+        query={
+            "bool": {
+                "must": [
+                    {"term": {"team_id": team_id}},
+                    {"term": {"type": "synced"}},
+                    {"bool": {"should": [{"term": {"member_id": mid}}, {"term": {"member_id": member_id.strip()}}], "minimum_should_match": 1}},
+                ]
+            }
+        },
+    )
+    return r.get("count", 0) > 0
+
+
 def get_calendar_slots(team_id: str, member_id_filter: Optional[str] = None, slot_type: Optional[str] = None) -> list:
     """Get calendar slots. slot_type: 'availability' or 'meeting' or None for all."""
     es = _es_client()
@@ -178,6 +201,89 @@ def delete_meeting(team_id: str, title: str, start: str = "", end: str = "") -> 
     if deleted:
         _log("DELETE", IDX_CALENDAR, deleted, f"team_id={team_id} title={title}")
     return deleted > 0
+
+
+def sync_member_calendar(
+    team_id: str,
+    member_id: str,
+    member_name: str,
+    events: list[dict],
+) -> int:
+    """
+    Replace a member's synced calendar in ES. Deletes existing type=synced for this member, then indexes all events.
+    Each event: {"title": str, "start": str, "end": str} or {"title", "start", "end", "summary"}.
+    Returns number of events indexed.
+    """
+    es = _es_client()
+    if not es:
+        return 0
+    _ensure_indices(es)
+    mid_lower = member_id.lower().strip()
+    # Remove existing synced events for this member (store lowercase for consistent lookup)
+    r = es.delete_by_query(
+        index=IDX_CALENDAR,
+        query={
+            "bool": {
+                "must": [
+                    {"term": {"team_id": team_id}},
+                    {"term": {"member_id": mid_lower}},
+                    {"term": {"type": "synced"}},
+                ]
+            }
+        },
+    )
+    deleted = r.get("deleted", 0)
+    if deleted:
+        _log("DELETE", IDX_CALENDAR, deleted, f"synced calendar member_id={member_id}")
+    # Only sync events in the next 7 days
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(days=7)
+    filtered = []
+    for ev in events:
+        start = ev.get("start") or ""
+        if not start:
+            continue
+        try:
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00")[:26])
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=timezone.utc)
+            start_dt = start_dt.astimezone(timezone.utc)
+            if now <= start_dt <= cutoff:
+                filtered.append(ev)
+        except Exception:
+            filtered.append(ev)
+    events = filtered
+    print(f"[ES] Syncing {len(events)} events (next 7 days only) to team_brain_calendar for member_id={mid_lower}", flush=True)
+    # Index all events (store member_id lowercase for has_synced_calendar lookup)
+    indexed = 0
+    for ev in events:
+        title = ev.get("title") or ev.get("name") or ""
+        start = ev.get("start") or ""
+        end = ev.get("end") or ""
+        if not title or not start or not end:
+            continue
+        summary = ev.get("summary") or ev.get("attendees") or ""
+        if isinstance(summary, list):
+            summary = ", ".join(str(x) for x in summary)
+        doc = {
+            "team_id": team_id,
+            "member_id": mid_lower,
+            "member_name": title,
+            "start": start,
+            "end": end,
+            "summary": summary,
+            "type": "synced",
+        }
+        es.index(index=IDX_CALENDAR, document=doc)
+        indexed += 1
+        if indexed <= 3:
+            print(f"  [ES] Indexed: {title[:50]} | {start} → {end}", flush=True)
+    if indexed > 3:
+        print(f"  [ES] ... and {indexed - 3} more events", flush=True)
+    if indexed:
+        _log("SYNC", IDX_CALENDAR, indexed, f"member_id={member_id}")
+    return indexed
 
 
 # --- Knowledge (with JINA semantic search) ---
