@@ -22,13 +22,13 @@ Server runs at `http://localhost:8000/mcp`
 
 ### 2. Connect to Poke
 
-**Option A: Tunnel (local dev)**
+**Option A: Tunnel (local dev)** — if you have the Poke CLI:
 
 ```bash
 poke tunnel http://localhost:8000/mcp --name "Team Brain"
 ```
 
-**Option B: Add remote URL**
+**Option B: Add remote URL** — no Poke CLI needed: run `ngrok http 8000`, then use `https://YOUR-NGROK-URL/mcp` in Poke settings.
 
 1. Deploy to Render (see below) or expose via ngrok
 2. Go to [poke.com/settings/connections](https://poke.com/settings/connections)
@@ -42,7 +42,14 @@ Ask Poke things like:
 - *"Use Team Brain to add milk to the shopping list"*
 - *"Use Team Brain to find when Alice and Bob are free next week"*
 
-## Tools (11 total)
+**Text-to-PR (Vercel / GitHub):** Register a repo once, then request changes via text. Poke will use Claude to edit the code and open a PR.
+
+1. *"Use Team Brain to register my project: repo https://github.com/username/my-app, branch main, name my Vercel project"* → calls `register_project`
+2. *"Use Team Brain to make changes on my Vercel project: make the header say Welcome and add a blue CTA button"* → calls `request_code_change`; you get back a PR link (and optional Vercel preview).
+
+Requires on the server: `GITHUB_TOKEN` (repo push + create PR), `ANTHROPIC_API_KEY` (Claude for code edits). Optional: `CLAUDE_CODING_MODEL` (default `claude-sonnet-4-5`).
+
+## Tools (14 total)
 
 | Tool | Description |
 |------|-------------|
@@ -56,6 +63,9 @@ Ask Poke things like:
 | `add_to_shopping_list` | Add item to shared list |
 | `get_shopping_list` | Get shopping list |
 | `remove_from_shopping_list` | Remove item |
+| `register_project` | Register a GitHub repo for “text-to-PR” (Vercel project) |
+| `list_projects_tool` | List registered projects for the team |
+| `request_code_change` | Request code changes on a registered project → agent makes edits and opens a PR |
 | `get_team_brain_info` | Server info |
 
 Use `team_id` (default: `"default"`) to scope to a team. Each teammate adds the same MCP server; the server stores data per team.
