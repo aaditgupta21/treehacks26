@@ -1,4 +1,4 @@
-# Team Brain MCP Server
+# Rapid
 
 Multiplayer Poke — a shared AI assistant for teams. Connect this MCP server to Poke for:
 
